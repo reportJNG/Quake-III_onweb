@@ -38,7 +38,7 @@ export class ArenaEngine extends EventTarget {
     this.emit('progress', { loaded: 0, total: 1, label: 'Loading engine module…' });
     let factory;
     try {
-      factory = (await import(/* @vite-ignore */ this.config.engineUrl)).default;
+      factory = (await this.#importEngineModule()).default;
     } catch (error) {
       throw new Error(`The WebAssembly engine is missing. Run \"npm run setup\" first. (${error.message})`);
     }
@@ -74,6 +74,18 @@ export class ArenaEngine extends EventTarget {
     const response = await fetch(url, { cache: 'no-cache' });
     if (!response.ok) throw new Error(`Could not load ${url} (${response.status}).`);
     return response.json();
+  }
+
+  async #importEngineModule() {
+    const response = await fetch(this.config.engineUrl, { cache: 'no-cache' });
+    if (!response.ok) throw new Error(`Could not load ${this.config.engineUrl} (${response.status}).`);
+    const source = await response.text();
+    const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+    try {
+      return await import(/* @vite-ignore */ url);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
   }
 
   async #prepareFilesystem(module, files) {
@@ -157,9 +169,9 @@ export class ArenaEngine extends EventTarget {
     });
   }
 
-  async start() {
+  async start({ captureMouse = true } = {}) {
     await this.load();
-    await this.resume();
+    if (captureMouse) await this.resume();
     this.emit('state', { state: 'running' });
   }
 

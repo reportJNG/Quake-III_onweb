@@ -9,7 +9,18 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $SourceDir = Join-Path $ProjectRoot 'vendor\ioq3'
 $BuildDir = Join-Path $ProjectRoot '.cache\ioq3-wasm'
 $OutputDir = Join-Path $ProjectRoot 'public\engine'
-$ExpectedCommit = '67e4fa978530ae0a3f62fedb0a26ac4797443429'
+$ExpectedCommit = 'a66ff00250ec3834421c6af7340cda311bc1cbb4'
+
+if (-not $EmsdkRoot) {
+    $LocalEmsdk = Join-Path $ProjectRoot 'vendor\emsdk'
+    if (Test-Path (Join-Path $LocalEmsdk 'emsdk_env.ps1')) { $EmsdkRoot = $LocalEmsdk }
+}
+$LocalCMake = Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'vendor') -Directory -Filter 'cmake-*-windows-x86_64' -ErrorAction SilentlyContinue |
+    Sort-Object Name -Descending | Select-Object -First 1
+$ToolPaths = @()
+if ($LocalCMake) { $ToolPaths += Join-Path $LocalCMake.FullName 'bin' }
+if (Test-Path (Join-Path $ProjectRoot 'vendor\ninja\ninja.exe')) { $ToolPaths += Join-Path $ProjectRoot 'vendor\ninja' }
+if ($ToolPaths.Count) { $env:PATH = ($ToolPaths -join [IO.Path]::PathSeparator) + [IO.Path]::PathSeparator + $env:PATH }
 
 if (-not (Test-Path (Join-Path $SourceDir 'CMakeLists.txt'))) { throw 'Pinned ioquake3 source is missing from vendor/ioq3.' }
 if (Test-Path (Join-Path $SourceDir '.git')) {
@@ -19,7 +30,8 @@ if (Test-Path (Join-Path $SourceDir '.git')) {
 if (-not $EmsdkRoot) { throw 'Set EMSDK to an activated Emscripten SDK 4.0.19 directory. See README.md.' }
 $Emcmake = Join-Path $EmsdkRoot 'upstream\emscripten\emcmake.bat'
 if (-not (Test-Path $Emcmake)) { throw "emcmake.bat was not found under EMSDK: $EmsdkRoot" }
-if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) { throw 'CMake is required and must be on PATH.' }
+if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) { throw 'CMake is required and must be on PATH or installed under vendor/cmake-*-windows-x86_64.' }
+if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { throw 'Ninja is required and must be on PATH or installed under vendor/ninja.' }
 if ($Clean -and (Test-Path $BuildDir)) {
     $resolved = (Resolve-Path $BuildDir).Path
     if (-not $resolved.StartsWith((Resolve-Path $ProjectRoot).Path)) { throw 'Unsafe build path.' }
@@ -27,7 +39,7 @@ if ($Clean -and (Test-Path $BuildDir)) {
 }
 New-Item -ItemType Directory -Force $BuildDir, $OutputDir | Out-Null
 
-& $Emcmake cmake -S $SourceDir -B $BuildDir -DCMAKE_BUILD_TYPE=Release -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF -DBUILD_GAME_LIBRARIES=OFF -DBUILD_GAME_QVMS=OFF -DUSE_OPENAL=OFF -DUSE_VOIP=OFF -DUSE_MUMBLE=OFF -DUSE_CODEC_OPUS=OFF
+& $Emcmake cmake -S $SourceDir -B $BuildDir -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF -DBUILD_GAME_LIBRARIES=OFF -DBUILD_GAME_QVMS=OFF -DUSE_OPENAL=OFF -DUSE_VOIP=OFF -DUSE_MUMBLE=OFF -DUSE_CODEC_OPUS=OFF
 if ($LASTEXITCODE -ne 0) { throw 'ioquake3 CMake configuration failed.' }
 & cmake --build $BuildDir --config Release --parallel
 if ($LASTEXITCODE -ne 0) { throw 'ioquake3 WebAssembly build failed.' }

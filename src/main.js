@@ -63,14 +63,15 @@ async function enterArena() {
       await unlock.close();
     }
   } catch (error) {
-    return fail(new Error(`Mouse or audio activation was denied: ${error.message}`));
+    console.warn(`Mouse or audio activation was deferred: ${error.message}`);
   }
   show('loading');
   playButton.disabled = true;
   try {
-    await engine.start();
+    await engine.start({ captureMouse: false });
     launched = true;
-    show(null);
+    if (document.pointerLockElement === canvas) show(null);
+    else show('resume');
   } catch (error) {
     fail(error);
   } finally {
@@ -80,7 +81,14 @@ async function enterArena() {
 
 playButton.addEventListener('click', enterArena);
 resumeButton.addEventListener('click', async () => {
-  try { await engine.resume(); show(null); } catch (error) { fail(error); }
+  try {
+    await engine.resume();
+    show(null);
+  } catch (error) {
+    console.warn(`Mouse capture was denied: ${error.message}`);
+    engine.pause();
+    show('resume');
+  }
 });
 retryButton.addEventListener('click', () => location.reload());
 
@@ -89,7 +97,12 @@ document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement === canvas) show(null);
   else { engine.pause(); show('resume'); }
 });
-document.addEventListener('pointerlockerror', () => fail(new Error('Mouse capture was denied. Click Resume and allow pointer lock.')));
+document.addEventListener('pointerlockerror', () => {
+  if (launched) {
+    engine.pause();
+    show('resume');
+  }
+});
 document.addEventListener('visibilitychange', () => {
   if (launched && document.hidden && document.pointerLockElement === canvas) document.exitPointerLock();
 });

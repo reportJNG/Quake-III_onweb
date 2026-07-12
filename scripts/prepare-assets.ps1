@@ -11,7 +11,7 @@ $ArchivePath = if ($Archive) { [IO.Path]::GetFullPath($Archive) } else { Join-Pa
 $ExtractDir = Join-Path $CacheDir 'openarena-0.8.8'
 $OutputDir = Join-Path $ProjectRoot 'public\baseoa'
 $ManifestPath = Join-Path $ProjectRoot 'public\engine\ioquake3-config.json'
-$Url = 'https://downloads.sourceforge.net/project/oarena/openarena-0.8.8.zip'
+$Url = 'https://master.dl.sourceforge.net/project/oarena/openarena-0.8.8.zip?viasf=1'
 $ExpectedSha1 = '37ab41990b37459822ce8c2fe590607616e1f6d1'
 
 New-Item -ItemType Directory -Force $CacheDir, $OutputDir, (Split-Path $ManifestPath) | Out-Null
@@ -21,7 +21,20 @@ if (-not (Test-Path -LiteralPath $ArchivePath)) {
     Invoke-WebRequest -Uri $Url -OutFile $ArchivePath -UseBasicParsing
 }
 
+$ArchiveInfo = Get-Item -LiteralPath $ArchivePath
+if ($ArchiveInfo.Length -lt 400MB -and -not $Archive) {
+    Write-Warning "Cached OpenArena archive is too small to be valid. Re-downloading '$ArchivePath'."
+    Remove-Item -LiteralPath $ArchivePath -Force
+    Invoke-WebRequest -Uri $Url -OutFile $ArchivePath -UseBasicParsing
+}
+
 $ActualSha1 = (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA1).Hash.ToLowerInvariant()
+if ($ActualSha1 -ne $ExpectedSha1 -and -not $Archive) {
+    Write-Warning "Cached OpenArena archive checksum mismatch. Re-downloading '$ArchivePath'."
+    Remove-Item -LiteralPath $ArchivePath -Force
+    Invoke-WebRequest -Uri $Url -OutFile $ArchivePath -UseBasicParsing
+    $ActualSha1 = (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA1).Hash.ToLowerInvariant()
+}
 if ($ActualSha1 -ne $ExpectedSha1) {
     throw "OpenArena archive checksum mismatch. Expected $ExpectedSha1, received $ActualSha1. Delete '$ArchivePath' and retry."
 }

@@ -77,7 +77,7 @@ If the game reports a missing engine, run `npm run build:engine`. If it reports 
 ## Licensing and source availability
 
 - The original `Quake-III-Arena/` tree is id Software's GPL source release and is retained as reference.
-- `vendor/ioq3/` is pinned to commit `67e4fa978530ae0a3f62fedb0a26ac4797443429` from [ioquake3](https://github.com/ioquake/ioq3), licensed under GPL-2.0 with its bundled third-party notices.
+- `vendor/ioq3/` is pinned to commit `a66ff00250ec3834421c6af7340cda311bc1cbb4` from [ioquake3](https://github.com/ioquake/ioq3), licensed under GPL-2.0 with its bundled third-party notices.
 - OpenArena 0.8.8 is a separate free-content game package. The setup script downloads the official release and verifies SHA-1 `37ab41990b37459822ce8c2fe590607616e1f6d1`.
 - The Vite integration code in this repository is distributed under GPL-2.0-or-later so that the combined engine distribution remains straightforward to share and modify.
 
