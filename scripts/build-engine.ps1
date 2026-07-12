@@ -52,4 +52,10 @@ foreach ($name in @('ioquake3.js', 'ioquake3.wasm')) {
     if (-not $artifact) { throw "Build succeeded but $name was not found." }
     Copy-Item -LiteralPath $artifact.FullName -Destination (Join-Path $OutputDir $name) -Force
 }
+$EngineJs = Join-Path $OutputDir 'ioquake3.js'
+foreach ($export in @('_IN_WebSetPointerLock', '_IN_WebInjectMouseMove', '_IN_WebInjectMouseButton', '_IN_WebInjectMouseWheel')) {
+    if (-not (Select-String -LiteralPath $EngineJs -SimpleMatch $export -Quiet)) {
+        throw "Engine artifact is missing required mouse export: $export"
+    }
+}
 Write-Host 'Engine artifacts copied to public/engine.'

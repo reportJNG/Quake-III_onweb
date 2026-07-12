@@ -9,7 +9,7 @@ export const GAME_CONFIG = Object.freeze({
   volume: 0.8,
   sensitivity: 5,
   engineUrl: '/engine/ioquake3.js',
-  engineRevision: 'direct-mouse-bridge-3',
+  engineRevision: 'direct-mouse-bridge-4',
   configUrl: '/engine/ioquake3-config.json',
   dataBaseUrl: '/',
   filesystemVersion: 1,

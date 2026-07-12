@@ -25,7 +25,7 @@ const resolution = new ResolutionController(canvas, gameStage, {
 
 function show(name) {
   Object.entries(screens).forEach(([key, element]) => element.classList.toggle('is-visible', key === name));
-  canvas.classList.toggle('is-running', name === null);
+  canvas.classList.toggle('is-running', name === null || (launched && name === 'resume'));
   hudTools.hidden = !launched;
 }
 
@@ -49,6 +49,17 @@ function bindEngine() {
     debugOutput.scrollTop = debugOutput.scrollHeight;
   });
   engine.addEventListener('fatal-error', ({ detail }) => fail(detail.error));
+  engine.addEventListener('capturechange', ({ detail }) => {
+    if (!launched) return;
+    if (detail.locked) show(null);
+    else { engine.pause(); show('resume'); }
+  });
+  engine.addEventListener('captureerror', ({ detail }) => {
+    if (!launched) return;
+    console.warn(`Mouse capture was denied: ${detail.error.message}`);
+    engine.pause();
+    show('resume');
+  });
 }
 
 function fail(error) {
@@ -101,21 +112,6 @@ resumeButton.addEventListener('click', async () => {
   }
 });
 retryButton.addEventListener('click', () => location.reload());
-
-document.addEventListener('pointerlockchange', () => {
-  if (!launched) return;
-  if (document.pointerLockElement === canvas) show(null);
-  else { engine.pause(); show('resume'); }
-});
-document.addEventListener('pointerlockerror', () => {
-  if (launched) {
-    engine.pause();
-    show('resume');
-  }
-});
-document.addEventListener('visibilitychange', () => {
-  if (launched && document.hidden && document.pointerLockElement === canvas) document.exitPointerLock();
-});
 
 function updateFullscreenButton() {
   const active = document.fullscreenElement === app;

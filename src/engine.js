@@ -2,6 +2,127 @@ import { GAME_CONFIG, startupArguments } from './config.js';
 
 const MAX_LOG_LINES = 400;
 
+export function connectNativeMouseBridge(canvas, module, log = () => {}) {
+  const doc = canvas.ownerDocument || document;
+  const native = {
+    lock: module?._IN_WebSetPointerLock,
+    move: module?._IN_WebInjectMouseMove,
+    button: module?._IN_WebInjectMouseButton,
+    wheel: module?._IN_WebInjectMouseWheel,
+  };
+  if (Object.values(native).some((fn) => typeof fn !== 'function')) {
+    throw new Error('The WebAssembly engine does not expose the native mouse bridge. Rebuild the engine.');
+  }
+
+  const locked = () => doc.pointerLockElement === canvas;
+  const onPointerLock = () => native.lock(locked() ? 1 : 0);
+  const onMouseMove = (event) => {
+    if (locked()) native.move(event.movementX || 0, event.movementY || 0);
+  };
+  const onMouseDown = (event) => {
+    if (locked()) native.button(event.button, 1);
+  };
+  const onMouseUp = (event) => {
+    if (locked()) native.button(event.button, 0);
+  };
+  const onWheel = (event) => {
+    if (!locked() || event.deltaY === 0) return;
+    native.wheel(event.deltaY < 0 ? 1 : -1);
+    event.preventDefault();
+  };
+  const onContextMenu = (event) => {
+    if (locked() || event.target === canvas) event.preventDefault();
+  };
+
+  doc.addEventListener('pointerlockchange', onPointerLock, true);
+  doc.addEventListener('mousemove', onMouseMove, true);
+  doc.addEventListener('mousedown', onMouseDown, true);
+  doc.addEventListener('mouseup', onMouseUp, true);
+  doc.addEventListener('wheel', onWheel, { capture: true, passive: false });
+  doc.addEventListener('contextmenu', onContextMenu, true);
+  onPointerLock();
+  log('Mouse bridge connected directly to the native game.');
+
+  return () => {
+    doc.removeEventListener('pointerlockchange', onPointerLock, true);
+    doc.removeEventListener('mousemove', onMouseMove, true);
+    doc.removeEventListener('mousedown', onMouseDown, true);
+    doc.removeEventListener('mouseup', onMouseUp, true);
+    doc.removeEventListener('wheel', onWheel, true);
+    doc.removeEventListener('contextmenu', onContextMenu, true);
+  };
+}
+
+export function connectMouseCapture(canvas, options = {}) {
+  const doc = options.documentTarget || canvas.ownerDocument || document;
+  const win = options.windowTarget || doc.defaultView || window;
+  const onChange = options.onChange || (() => {});
+  const onError = options.onError || (() => {});
+  const activate = options.activate || (() => {});
+  let disposed = false;
+
+  const locked = () => doc.pointerLockElement === canvas;
+  const sync = () => onChange(locked());
+  const release = () => {
+    if (locked()) doc.exitPointerLock();
+  };
+  const capture = () => {
+    if (disposed) return Promise.resolve();
+    try {
+      if (locked()) return Promise.resolve(activate()).then(() => undefined);
+      try {
+        canvas.focus({ preventScroll: true });
+      } catch {
+        canvas.focus();
+      }
+      // This must happen before any await so the browser user gesture remains valid.
+      const lockRequest = canvas.requestPointerLock();
+      const activation = activate();
+      return Promise.all([Promise.resolve(lockRequest), Promise.resolve(activation)])
+        .then(() => undefined)
+        .catch((error) => {
+          onError(error);
+          throw error;
+        });
+    } catch (error) {
+      onError(error);
+      return Promise.reject(error);
+    }
+  };
+  const onCanvasClick = () => {
+    capture().catch(() => {});
+  };
+  const onPointerLockError = () => onError(new Error('The browser denied mouse capture.'));
+  const onVisibilityChange = () => {
+    if (doc.hidden) release();
+    else sync();
+  };
+
+  canvas.addEventListener('click', onCanvasClick);
+  doc.addEventListener('pointerlockchange', sync);
+  doc.addEventListener('pointerlockerror', onPointerLockError);
+  doc.addEventListener('fullscreenchange', sync);
+  doc.addEventListener('visibilitychange', onVisibilityChange);
+  win.addEventListener('focus', sync);
+  win.addEventListener('blur', release);
+  sync();
+
+  return {
+    capture,
+    release,
+    disconnect() {
+      disposed = true;
+      canvas.removeEventListener('click', onCanvasClick);
+      doc.removeEventListener('pointerlockchange', sync);
+      doc.removeEventListener('pointerlockerror', onPointerLockError);
+      doc.removeEventListener('fullscreenchange', sync);
+      doc.removeEventListener('visibilitychange', onVisibilityChange);
+      win.removeEventListener('focus', sync);
+      win.removeEventListener('blur', release);
+    },
+  };
+}
+
 export class ArenaEngine extends EventTarget {
   constructor(canvas, config = GAME_CONFIG) {
     super();
@@ -13,6 +134,7 @@ export class ArenaEngine extends EventTarget {
     this.disposed = false;
     this.logs = [];
     this.mouseBridge = null;
+    this.mouseCapture = null;
   }
 
   emit(type, detail = {}) {
@@ -56,9 +178,8 @@ export class ArenaEngine extends EventTarget {
     try {
       this.module = await factory({
         canvas: this.canvas,
-        // Let Emscripten/SDL request pointer lock from a real canvas click.
-        // SDL_SetRelativeMouseMode then owns the complete mouse lifecycle.
-        elementPointerLock: true,
+        // Browser-side capture is managed explicitly after the engine is ready.
+        elementPointerLock: false,
         arguments: startupArguments(this.config),
         locateFile: (file) => {
           const url = new URL(file, engineDir);
@@ -71,6 +192,7 @@ export class ArenaEngine extends EventTarget {
         preRun: [async (module) => this.#prepareFilesystem(module, files)],
       });
       this.#bindMouseBridge();
+      this.#bindMouseCapture();
       this.emit('state', { state: 'ready' });
       return this.module;
     } catch (error) {
@@ -86,7 +208,9 @@ export class ArenaEngine extends EventTarget {
   }
 
   async #importEngineModule() {
-    const response = await fetch(this.config.engineUrl, { cache: 'no-cache' });
+    const engineUrl = new URL(this.config.engineUrl, location.href);
+    if (this.config.engineRevision) engineUrl.searchParams.set('v', this.config.engineRevision);
+    const response = await fetch(engineUrl, { cache: 'no-cache' });
     if (!response.ok) throw new Error(`Could not load ${this.config.engineUrl} (${response.status}).`);
     const source = await response.text();
     const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
@@ -180,52 +304,28 @@ export class ArenaEngine extends EventTarget {
 
   #bindMouseBridge() {
     this.#unbindMouseBridge();
-    const native = {
-      lock: this.module?._IN_WebSetPointerLock,
-      move: this.module?._IN_WebInjectMouseMove,
-      button: this.module?._IN_WebInjectMouseButton,
-      wheel: this.module?._IN_WebInjectMouseWheel,
-    };
-    if (Object.values(native).some((fn) => typeof fn !== 'function')) {
-      throw new Error('The WebAssembly engine does not expose the native mouse bridge. Rebuild the engine.');
-    }
-
-    const locked = () => document.pointerLockElement === this.canvas;
-    const onPointerLock = () => native.lock(locked() ? 1 : 0);
-    const onMouseMove = (event) => {
-      if (locked()) native.move(event.movementX || 0, event.movementY || 0);
-    };
-    const onMouseDown = (event) => {
-      if (locked()) native.button(event.button, 1);
-    };
-    const onMouseUp = (event) => {
-      if (locked()) native.button(event.button, 0);
-    };
-    const onWheel = (event) => {
-      if (!locked() || event.deltaY === 0) return;
-      native.wheel(event.deltaY < 0 ? 1 : -1);
-      event.preventDefault();
-    };
-
-    document.addEventListener('pointerlockchange', onPointerLock, true);
-    document.addEventListener('mousemove', onMouseMove, true);
-    document.addEventListener('mousedown', onMouseDown, true);
-    document.addEventListener('mouseup', onMouseUp, true);
-    document.addEventListener('wheel', onWheel, { capture: true, passive: false });
-    this.mouseBridge = { onPointerLock, onMouseMove, onMouseDown, onMouseUp, onWheel };
-    onPointerLock();
-    this.log('Mouse bridge connected directly to the native game.');
+    this.mouseBridge = connectNativeMouseBridge(this.canvas, this.module, (message) => this.log(message));
   }
 
   #unbindMouseBridge() {
     if (!this.mouseBridge) return;
-    const { onPointerLock, onMouseMove, onMouseDown, onMouseUp, onWheel } = this.mouseBridge;
-    document.removeEventListener('pointerlockchange', onPointerLock, true);
-    document.removeEventListener('mousemove', onMouseMove, true);
-    document.removeEventListener('mousedown', onMouseDown, true);
-    document.removeEventListener('mouseup', onMouseUp, true);
-    document.removeEventListener('wheel', onWheel, true);
+    this.mouseBridge();
     this.mouseBridge = null;
+  }
+
+  #bindMouseCapture() {
+    this.#unbindMouseCapture();
+    this.mouseCapture = connectMouseCapture(this.canvas, {
+      activate: () => ArenaEngine.resumeAudio(),
+      onChange: (locked) => this.emit('capturechange', { locked }),
+      onError: (error) => this.emit('captureerror', { error }),
+    });
+  }
+
+  #unbindMouseCapture() {
+    if (!this.mouseCapture) return;
+    this.mouseCapture.disconnect();
+    this.mouseCapture = null;
   }
 
   async start({ captureMouse = true } = {}) {
@@ -247,16 +347,8 @@ export class ArenaEngine extends EventTarget {
   }
 
   async resume() {
-    await ArenaEngine.resumeAudio();
-    this.canvas.focus();
-    if (document.pointerLockElement !== this.canvas) {
-      try {
-        await this.canvas.requestPointerLock({ unadjustedMovement: true });
-      } catch (error) {
-        // Firefox and older Chromium builds do not accept the options object.
-        await this.canvas.requestPointerLock();
-      }
-    }
+    if (!this.mouseCapture) await this.load();
+    await this.mouseCapture.capture();
     this.emit('state', { state: 'running' });
   }
 
@@ -272,6 +364,7 @@ export class ArenaEngine extends EventTarget {
 
   dispose() {
     this.disposed = true;
+    this.#unbindMouseCapture();
     this.#unbindMouseBridge();
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
     this.module?.quit?.();

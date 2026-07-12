@@ -63,7 +63,7 @@ The precise output subdirectory can vary by CMake generator. Copy the generated 
 
 Click **Play** to load the native OpenArena main menu. Maps, game modes, bots, difficulty, and match limits are selected inside the real game UI rather than duplicated by the web shell.
 
-The site requires HTTP(S); it cannot run directly from `file://`. The supported targets are current desktop Chrome, Edge, and Firefox with WebAssembly, WebGL2, Web Audio, and Pointer Lock enabled. The canvas uses a centered 16:9 stage at an appropriate high-DPI resolution, while the engine remains in windowed mode; the optional fullscreen button uses browser fullscreen. After loading, click directly in the native game UI to let SDL capture the mouse. Mobile/touch input and internet multiplayer are outside this version.
+The site requires HTTP(S); it cannot run directly from `file://`. The supported targets are current desktop Chrome, Edge, and Firefox with WebAssembly, WebGL2, Web Audio, and Pointer Lock enabled. The canvas uses a centered 16:9 stage at an appropriate high-DPI resolution, while the engine remains in windowed mode; the optional fullscreen button uses browser fullscreen. After loading, click the game canvas to capture the mouse. Escape releases it, and another canvas click recaptures it. Browser events are forwarded through the WebAssembly mouse bridge rather than SDL's desktop relative-mouse path. Mobile/touch input and internet multiplayer are outside this version.
 
 ## Architecture and troubleshooting
 
