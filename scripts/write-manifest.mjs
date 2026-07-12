@@ -1,0 +1,10 @@
+import { readdir, writeFile, mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
+const root = resolve(import.meta.dirname, '..');
+const dir = resolve(root, 'public/baseoa');
+const files = (await readdir(dir)).filter((name) => name.endsWith('.pk3')).sort();
+if (!files.length) throw new Error('No PK3 files found in public/baseoa.');
+const manifest = { baseoa: { version: '0.8.8', archiveSha1: '37ab41990b37459822ce8c2fe590607616e1f6d1', files: files.map((name) => ({ src: `baseoa/${name}`, dst: '/baseoa' })) } };
+await mkdir(resolve(root, 'public/engine'), { recursive: true });
+await writeFile(resolve(root, 'public/engine/ioquake3-config.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+console.log(`Wrote manifest for ${files.length} PK3 files.`);

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#08090c" />
+    <meta name="description" content="OpenArena running natively in your browser through ioquake3 and WebAssembly." />
+    <title>OpenArena Web</title>
+  </head>
+  <body>
+    <main id="app">
+      <canvas id="game-canvas" tabindex="0" aria-label="OpenArena game canvas"></canvas>
+
+      <section id="landing" class="screen is-visible" aria-labelledby="game-title">
+        <div class="eyebrow">IOQUAKE3 · WEBASSEMBLY</div>
+        <h1 id="game-title">OPEN<span>ARENA</span></h1>
+        <p class="tagline">Fast. Free. In your browser.</p>
+        <button id="play-button" class="primary" type="button">PLAY</button>
+        <p class="requirement">Desktop keyboard + mouse · WebGL 2</p>
+        <div class="controls" aria-label="Game controls">
+          <span><kbd>WASD</kbd> MOVE</span><span><kbd>MOUSE</kbd> AIM / FIRE</span>
+          <span><kbd>SPACE</kbd> JUMP</span><span><kbd>1–9</kbd> WEAPONS</span>
+          <span><kbd>TAB</kbd> SCORE</span><span><kbd>ESC</kbd> RELEASE MOUSE</span>
+        </div>
+      </section>
+
+      <section id="loading" class="screen" aria-live="polite">
+        <div class="loader-mark">OA</div>
+        <h2 id="loading-title">INITIALIZING ARENA</h2>
+        <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+        <p id="progress-label">Preparing engine…</p>
+      </section>
+
+      <section id="resume" class="screen compact">
+        <h2>MATCH PAUSED</h2>
+        <p>The arena is still running.</p>
+        <button id="resume-button" class="primary" type="button">CLICK TO RESUME</button>
+      </section>
+
+      <section id="error" class="screen compact" role="alert">
+        <div class="error-code">RUNTIME ERROR</div>
+        <h2>COULD NOT ENTER THE ARENA</h2>
+        <p id="error-message"></p>
+        <button id="retry-button" class="primary" type="button">RETRY</button>
+      </section>
+
+      <div id="hud-tools" class="hud-tools" hidden>
+        <button id="fullscreen-button" type="button" title="Toggle fullscreen">FULLSCREEN</button>
+        <button id="debug-button" type="button" title="Show engine log">LOG</button>
+      </div>
+
+      <aside id="debug-panel" class="debug-panel" hidden>
+        <header><strong>ENGINE LOG</strong><button id="debug-close" type="button">CLOSE</button></header>
+        <pre id="debug-output"></pre>
+      </aside>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

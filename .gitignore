@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.cache/
+public/engine/*
+!public/engine/.gitkeep
+public/baseoa/*
+!public/baseoa/.gitkeep
+vendor/emsdk/
+vendor/ioq3/.git/
+*.log

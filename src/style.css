@@ -1,0 +1,40 @@
+:root { color-scheme: dark; font-family: 'Arial Narrow', Impact, system-ui, sans-serif; background: #050609; color: #f5f5f2; }
+* { box-sizing: border-box; }
+html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { background: #050609; }
+#app { position: relative; isolation: isolate; background: radial-gradient(circle at 50% 46%, #252a2f 0, #0e1014 38%, #050609 78%); }
+#app::before { content: ''; position: absolute; inset: 0; z-index: -1; opacity: .18; background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size: 38px 38px; transform: perspective(600px) rotateX(55deg) scale(1.7); }
+#game-canvas { display: block; width: 100%; height: 100%; border: 0; outline: 0; object-fit: contain; background: #000; opacity: 0; }
+#game-canvas.is-running { opacity: 1; }
+.screen { position: absolute; inset: 0; display: none; place-content: center; justify-items: center; padding: 3rem 1.5rem; text-align: center; background: radial-gradient(circle at center, rgba(24,27,32,.72), rgba(5,6,9,.96)); }
+.screen.is-visible { display: grid; animation: reveal .35s ease-out; }
+.screen.compact { background: rgba(4,5,8,.82); backdrop-filter: blur(8px); }
+@keyframes reveal { from { opacity: 0; transform: scale(1.015); } }
+.eyebrow, .error-code { color: #c8ff2e; letter-spacing: .32em; font-weight: 800; font-size: .82rem; }
+h1 { margin: .2rem 0 0; font: 800 clamp(4rem, 13vw, 10rem)/.85 Impact, sans-serif; letter-spacing: -.04em; text-shadow: 0 0 50px rgba(200,255,46,.08); }
+h1 span { color: transparent; -webkit-text-stroke: 2px #c8ff2e; }
+h2 { font: 800 clamp(2rem, 5vw, 4rem)/1 Impact, sans-serif; margin: 1rem 0 .5rem; letter-spacing: .04em; }
+.tagline { margin: 1.2rem 0 2rem; text-transform: uppercase; letter-spacing: .42em; color: #9ca1a9; }
+button { font: 800 1rem Impact, sans-serif; letter-spacing: .1em; color: inherit; background: #16191e; border: 1px solid #424852; padding: .8rem 1rem; cursor: pointer; }
+button:hover, button:focus-visible { border-color: #c8ff2e; color: #c8ff2e; outline: none; }
+button.primary { min-width: 14rem; padding: 1.2rem 2.6rem; color: #080a08; background: #c8ff2e; border-color: #c8ff2e; clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%); }
+button.primary:hover { background: #e2ff91; color: #050605; transform: translateY(-2px); }
+button:disabled { opacity: .55; cursor: wait; }
+.requirement { color: #777e88; letter-spacing: .1em; }
+.controls { margin-top: 2.5rem; display: grid; grid-template-columns: repeat(3, auto); gap: .8rem 2.2rem; color: #9ca1a9; font-weight: 600; letter-spacing: .08em; }
+kbd { color: #f4f5f2; font-family: inherit; }
+.loader-mark { display: grid; place-content: center; width: 5rem; height: 5rem; border: 2px solid #c8ff2e; color: #c8ff2e; font: 800 1.6rem Orbitron; transform: rotate(45deg); }
+.loader-mark::first-line { transform: rotate(-45deg); }
+.progress-track { width: min(34rem, 80vw); height: 5px; background: #2a2e34; margin-top: 2rem; overflow: hidden; }
+.progress-bar { width: 2%; height: 100%; background: #c8ff2e; box-shadow: 0 0 18px #c8ff2e; transition: width .18s ease; }
+#progress-label { color: #969ca4; }
+.hud-tools { position: fixed; z-index: 3; top: 1rem; right: 1rem; opacity: .25; transition: opacity .2s; }
+.hud-tools:hover { opacity: 1; }
+.hud-tools button { font-size: .65rem; padding: .55rem .7rem; }
+.debug-panel { position: fixed; z-index: 5; right: 1rem; bottom: 1rem; width: min(46rem, calc(100vw - 2rem)); height: min(25rem, 50vh); background: rgba(4,5,8,.96); border: 1px solid #3a4048; box-shadow: 0 1rem 4rem #000; }
+.debug-panel header { display: flex; justify-content: space-between; align-items: center; padding: .6rem .8rem; border-bottom: 1px solid #3a4048; color: #c8ff2e; }
+.debug-panel button { padding: .3rem .6rem; font-size: .6rem; }
+.debug-panel pre { height: calc(100% - 3rem); overflow: auto; margin: 0; padding: .8rem; white-space: pre-wrap; color: #aeb7a3; font: .72rem/1.45 ui-monospace, monospace; text-align: left; }
+.error-code { color: #ff5b55; }
+#error-message { max-width: 42rem; color: #c1c4c8; margin: .8rem 0 2rem; }
+@media (max-width: 700px) { .controls { grid-template-columns: repeat(2, auto); gap: .7rem 1rem; } h1 span { -webkit-text-stroke-width: 1px; } }
