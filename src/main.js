@@ -1,7 +1,10 @@
 import './style.css';
 import { ArenaEngine } from './engine.js';
+import { ResolutionController } from './resolution.js';
 
 const canvas = document.querySelector('#game-canvas');
+const app = document.querySelector('#app');
+const gameStage = document.querySelector('#game-stage');
 const screens = Object.fromEntries(['landing', 'loading', 'resume', 'error'].map((id) => [id, document.querySelector(`#${id}`)]));
 const playButton = document.querySelector('#play-button');
 const resumeButton = document.querySelector('#resume-button');
@@ -12,8 +15,13 @@ const errorMessage = document.querySelector('#error-message');
 const hudTools = document.querySelector('#hud-tools');
 const debugPanel = document.querySelector('#debug-panel');
 const debugOutput = document.querySelector('#debug-output');
+const fullscreenButton = document.querySelector('#fullscreen-button');
 let engine = new ArenaEngine(canvas);
 let launched = false;
+const resolution = new ResolutionController(canvas, gameStage, {
+  dprLimit: 2,
+  onResize: (detail) => engine.resize(detail),
+});
 
 function show(name) {
   Object.entries(screens).forEach(([key, element]) => element.classList.toggle('is-visible', key === name));
@@ -52,10 +60,10 @@ function fail(error) {
 async function enterArena() {
   const unsupported = browserProblem();
   if (unsupported) return fail(new Error(unsupported));
-  // Pointer lock and audio must be initiated synchronously from the Play gesture.
-  // Browser user activation may expire while the large PK3 payload downloads.
+  // Unlock audio from the initial gesture, but do not capture the mouse yet.
+  // SDL installs its mouse listeners while the engine loads; capturing earlier
+  // means it can miss the pointer-lock transition and receive no mouse movement.
   try {
-    if (document.pointerLockElement !== canvas) await canvas.requestPointerLock();
     const UnlockContext = window.AudioContext || window.webkitAudioContext;
     if (UnlockContext) {
       const unlock = new UnlockContext();
@@ -69,9 +77,11 @@ async function enterArena() {
   playButton.disabled = true;
   try {
     await engine.start({ captureMouse: false });
+    resolution.sync();
     launched = true;
-    if (document.pointerLockElement === canvas) show(null);
-    else show('resume');
+    // Show the native UI immediately. The player's first real click on the
+    // canvas is handled by Emscripten and enables SDL relative mouse mode.
+    show(null);
   } catch (error) {
     fail(error);
   } finally {
@@ -107,12 +117,22 @@ document.addEventListener('visibilitychange', () => {
   if (launched && document.hidden && document.pointerLockElement === canvas) document.exitPointerLock();
 });
 
-document.querySelector('#fullscreen-button').addEventListener('click', async () => {
+function updateFullscreenButton() {
+  const active = document.fullscreenElement === app;
+  fullscreenButton.textContent = active ? 'EXIT FULLSCREEN' : 'FULLSCREEN';
+  fullscreenButton.setAttribute('aria-pressed', String(active));
+}
+
+fullscreenButton.addEventListener('click', async () => {
   try {
     if (document.fullscreenElement) await document.exitFullscreen();
-    else await document.querySelector('#app').requestFullscreen();
-  } catch (error) { fail(error); }
+    else await app.requestFullscreen({ navigationUI: 'hide' });
+  } catch (error) {
+    console.warn(`Fullscreen was unavailable: ${error.message}`);
+    updateFullscreenButton();
+  }
 });
+document.addEventListener('fullscreenchange', updateFullscreenButton);
 document.querySelector('#debug-button').addEventListener('click', () => { debugPanel.hidden = false; });
 document.querySelector('#debug-close').addEventListener('click', () => { debugPanel.hidden = true; });
 
@@ -122,4 +142,10 @@ window.addEventListener('keydown', (event) => {
 }, { passive: false });
 
 bindEngine();
-if (import.meta.hot) import.meta.hot.dispose(() => engine.dispose());
+resolution.start();
+updateFullscreenButton();
+if (import.meta.hot) import.meta.hot.dispose(() => {
+  resolution.dispose();
+  document.removeEventListener('fullscreenchange', updateFullscreenButton);
+  engine.dispose();
+});

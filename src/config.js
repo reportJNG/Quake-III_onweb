@@ -9,6 +9,7 @@ export const GAME_CONFIG = Object.freeze({
   volume: 0.8,
   sensitivity: 5,
   engineUrl: '/engine/ioquake3.js',
+  engineRevision: 'direct-mouse-bridge-3',
   configUrl: '/engine/ioquake3-config.json',
   dataBaseUrl: '/',
   filesystemVersion: 1,
@@ -20,16 +21,14 @@ export function startupArguments(config = GAME_CONFIG) {
     '+set', 'net_enabled', '0',
     '+set', 'r_mode', '-2',
     '+set', 'r_fullscreen', '0',
+    '+set', 'r_centerWindow', '1',
+    '+set', 'in_mouse', '1',
+    '+set', 'in_nograb', '0',
     '+set', 'com_basegame', config.baseGame,
     '+set', 'com_homepath', 'openarena-web',
     '+set', 'com_gamename', 'openarena',
-    '+set', 'g_gametype', String(config.gameType),
-    '+set', 'fraglimit', String(config.fragLimit),
-    '+set', 'timelimit', String(config.timeLimit),
     '+set', 's_volume', String(config.volume),
     '+set', 'sensitivity', String(config.sensitivity),
-    '+map', config.map,
   ];
-  for (const bot of config.bots) args.push('+addbot', bot, String(config.botSkill));
   return args;
 }

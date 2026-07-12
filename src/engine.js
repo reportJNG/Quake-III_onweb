@@ -12,6 +12,7 @@ export class ArenaEngine extends EventTarget {
     this.loading = null;
     this.disposed = false;
     this.logs = [];
+    this.mouseBridge = null;
   }
 
   emit(type, detail = {}) {
@@ -55,13 +56,21 @@ export class ArenaEngine extends EventTarget {
     try {
       this.module = await factory({
         canvas: this.canvas,
+        // Let Emscripten/SDL request pointer lock from a real canvas click.
+        // SDL_SetRelativeMouseMode then owns the complete mouse lifecycle.
+        elementPointerLock: true,
         arguments: startupArguments(this.config),
-        locateFile: (file) => new URL(file, engineDir).href,
+        locateFile: (file) => {
+          const url = new URL(file, engineDir);
+          if (this.config.engineRevision) url.searchParams.set('v', this.config.engineRevision);
+          return url.href;
+        },
         print: (text) => this.log(text, 'stdout'),
         printErr: (text) => this.log(text, 'stderr'),
         onAbort: (reason) => this.emit('fatal-error', { error: new Error(String(reason)) }),
         preRun: [async (module) => this.#prepareFilesystem(module, files)],
       });
+      this.#bindMouseBridge();
       this.emit('state', { state: 'ready' });
       return this.module;
     } catch (error) {
@@ -169,10 +178,68 @@ export class ArenaEngine extends EventTarget {
     });
   }
 
+  #bindMouseBridge() {
+    this.#unbindMouseBridge();
+    const native = {
+      lock: this.module?._IN_WebSetPointerLock,
+      move: this.module?._IN_WebInjectMouseMove,
+      button: this.module?._IN_WebInjectMouseButton,
+      wheel: this.module?._IN_WebInjectMouseWheel,
+    };
+    if (Object.values(native).some((fn) => typeof fn !== 'function')) {
+      throw new Error('The WebAssembly engine does not expose the native mouse bridge. Rebuild the engine.');
+    }
+
+    const locked = () => document.pointerLockElement === this.canvas;
+    const onPointerLock = () => native.lock(locked() ? 1 : 0);
+    const onMouseMove = (event) => {
+      if (locked()) native.move(event.movementX || 0, event.movementY || 0);
+    };
+    const onMouseDown = (event) => {
+      if (locked()) native.button(event.button, 1);
+    };
+    const onMouseUp = (event) => {
+      if (locked()) native.button(event.button, 0);
+    };
+    const onWheel = (event) => {
+      if (!locked() || event.deltaY === 0) return;
+      native.wheel(event.deltaY < 0 ? 1 : -1);
+      event.preventDefault();
+    };
+
+    document.addEventListener('pointerlockchange', onPointerLock, true);
+    document.addEventListener('mousemove', onMouseMove, true);
+    document.addEventListener('mousedown', onMouseDown, true);
+    document.addEventListener('mouseup', onMouseUp, true);
+    document.addEventListener('wheel', onWheel, { capture: true, passive: false });
+    this.mouseBridge = { onPointerLock, onMouseMove, onMouseDown, onMouseUp, onWheel };
+    onPointerLock();
+    this.log('Mouse bridge connected directly to the native game.');
+  }
+
+  #unbindMouseBridge() {
+    if (!this.mouseBridge) return;
+    const { onPointerLock, onMouseMove, onMouseDown, onMouseUp, onWheel } = this.mouseBridge;
+    document.removeEventListener('pointerlockchange', onPointerLock, true);
+    document.removeEventListener('mousemove', onMouseMove, true);
+    document.removeEventListener('mousedown', onMouseDown, true);
+    document.removeEventListener('mouseup', onMouseUp, true);
+    document.removeEventListener('wheel', onWheel, true);
+    this.mouseBridge = null;
+  }
+
   async start({ captureMouse = true } = {}) {
     await this.load();
     if (captureMouse) await this.resume();
     this.emit('state', { state: 'running' });
+  }
+
+  resize(detail) {
+    if (!this.module) return;
+    this.log(`Display resized to ${detail.width}x${detail.height} (${detail.cssWidth}x${detail.cssHeight} CSS pixels).`);
+    // Emscripten's SDL backend updates its window, GL viewport, and input scale
+    // from the browser resize event after the canvas backing store is changed.
+    window.dispatchEvent(new Event('resize'));
   }
 
   pause() {
@@ -182,7 +249,14 @@ export class ArenaEngine extends EventTarget {
   async resume() {
     await ArenaEngine.resumeAudio();
     this.canvas.focus();
-    if (document.pointerLockElement !== this.canvas) await this.canvas.requestPointerLock();
+    if (document.pointerLockElement !== this.canvas) {
+      try {
+        await this.canvas.requestPointerLock({ unadjustedMovement: true });
+      } catch (error) {
+        // Firefox and older Chromium builds do not accept the options object.
+        await this.canvas.requestPointerLock();
+      }
+    }
     this.emit('state', { state: 'running' });
   }
 
@@ -198,6 +272,7 @@ export class ArenaEngine extends EventTarget {
 
   dispose() {
     this.disposed = true;
+    this.#unbindMouseBridge();
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
     this.module?.quit?.();
     this.module = null;

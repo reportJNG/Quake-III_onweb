@@ -61,9 +61,9 @@ The precise output subdirectory can vary by CMake generator. Copy the generated 
 - Escape: release the pointer and show the resume overlay
 - Fullscreen and engine-log controls appear in the top-right during play
 
-The default match is free-for-all on `oa_dm1`, with Sarge, Major, and Grunt at skill 3, a 20-frag limit, and a 10-minute time limit. Change these defaults in `src/config.js`.
+Click **Play** to load the native OpenArena main menu. Maps, game modes, bots, difficulty, and match limits are selected inside the real game UI rather than duplicated by the web shell.
 
-The site requires HTTP(S); it cannot run directly from `file://`. The supported targets are current desktop Chrome, Edge, and Firefox with WebAssembly, WebGL2, Web Audio, and Pointer Lock enabled. Mobile/touch input and online multiplayer are outside this version.
+The site requires HTTP(S); it cannot run directly from `file://`. The supported targets are current desktop Chrome, Edge, and Firefox with WebAssembly, WebGL2, Web Audio, and Pointer Lock enabled. The canvas uses a centered 16:9 stage at an appropriate high-DPI resolution, while the engine remains in windowed mode; the optional fullscreen button uses browser fullscreen. After loading, click directly in the native game UI to let SDL capture the mouse. Mobile/touch input and internet multiplayer are outside this version.
 
 ## Architecture and troubleshooting
 
