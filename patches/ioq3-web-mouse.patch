@@ -1,0 +1,196 @@
+diff --git a/code/sdl/sdl_input.c b/code/sdl/sdl_input.c
+index dcc6bc5..261f036 100644
+--- a/code/sdl/sdl_input.c
++++ b/code/sdl/sdl_input.c
+@@ -30,6 +30,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
++#if defined(__EMSCRIPTEN__)
++#include <emscripten/emscripten.h>
++#endif
++
+ #include "../client/client.h"
+ #include "../sys/sys_local.h"
+ 
+@@ -59,6 +63,97 @@ static int in_eventTime = 0;
+ 
+ static SDL_Window *SDL_window = NULL;
+ 
++#if defined(__EMSCRIPTEN__)
++static qboolean webPointerLocked = qfalse;
++static unsigned short webMouseButtons = 0;
++static unsigned int webMouseMotions = 0;
++
++static int IN_WebMouseButton( unsigned short button )
++{
++	switch( button )
++	{
++		case 0: return K_MOUSE1;
++		case 1: return K_MOUSE3;
++		case 2: return K_MOUSE2;
++		case 3: return K_MOUSE4;
++		case 4: return K_MOUSE5;
++		default: return K_AUX1 + ( button - 4 ) % 16;
++	}
++}
++
++EMSCRIPTEN_KEEPALIVE void IN_WebSetPointerLock( int active )
++{
++	int button;
++
++	webPointerLocked = active ? qtrue : qfalse;
++	Com_Printf( "Browser mouse: pointer lock %s (motions: %u)\n",
++		webPointerLocked ? "active" : "released", webMouseMotions );
++
++	if( !webPointerLocked )
++	{
++		for( button = 0; button < 5; button++ )
++		{
++			if( webMouseButtons & ( 1u << button ) )
++				Com_QueueEvent( Sys_Milliseconds(), SE_KEY,
++					IN_WebMouseButton( button ), qfalse, 0, NULL );
++		}
++		webMouseButtons = 0;
++	}
++}
++
++EMSCRIPTEN_KEEPALIVE void IN_WebInjectMouseMove( int movementX, int movementY )
++{
++	/* Pointer Lock is the browser's authoritative capture state. SDL's
++	 * mouseActive flag can lag behind it or remain false when JavaScript
++	 * initiated the lock, which must not discard otherwise valid movement. */
++	if( !webPointerLocked || ( !movementX && !movementY ) )
++		return;
++
++	Com_QueueEvent( Sys_Milliseconds(), SE_MOUSE,
++		movementX, movementY, 0, NULL );
++	webMouseMotions++;
++	if( webMouseMotions == 1 )
++		Com_Printf( "Browser mouse: received first motion event\n" );
++	else if( !( webMouseMotions & 255 ) )
++		Com_DPrintf( "Browser mouse: received %u motion events\n", webMouseMotions );
++}
++
++EMSCRIPTEN_KEEPALIVE void IN_WebInjectMouseButton( int button, int active )
++{
++	qboolean down;
++
++	if( !webPointerLocked || button < 0 || button > 4 )
++		return;
++
++	down = active ? qtrue : qfalse;
++	if( down )
++		webMouseButtons |= 1u << button;
++	else
++		webMouseButtons &= ~( 1u << button );
++	Com_QueueEvent( Sys_Milliseconds(), SE_KEY,
++		IN_WebMouseButton( button ), down, 0, NULL );
++	Com_Printf( "Browser mouse: button %d %s\n", button,
++		down ? "down" : "up" );
++}
++
++EMSCRIPTEN_KEEPALIVE void IN_WebInjectMouseWheel( int direction )
++{
++	int key;
++
++	if( !webPointerLocked || direction == 0 )
++		return;
++
++	key = direction > 0 ? K_MWHEELUP : K_MWHEELDOWN;
++	Com_QueueEvent( Sys_Milliseconds(), SE_KEY, key, qtrue, 0, NULL );
++	Com_QueueEvent( Sys_Milliseconds(), SE_KEY, key, qfalse, 0, NULL );
++}
++
++static void IN_InitWebMouse( void )
++{
++	Com_Printf( "Browser mouse: JavaScript-to-native bridge initialized\n" );
++}
++#endif
++
+ #define CTRL(a) ((a)-'a'+1)
+ 
+ /*
+@@ -346,5 +441,6 @@ IN_ActivateMouse
+ ===============
+ */
++#if !defined(__EMSCRIPTEN__)
+ static void IN_ActivateMouse( qboolean isFullscreen )
+ {
+ 	if (!mouseAvailable || !SDL_WasInit( SDL_INIT_VIDEO ) )
+@@ -377,6 +473,7 @@ static void IN_ActivateMouse( qboolean isFullscreen )
+ 
+ 	mouseActive = qtrue;
+ }
++#endif
+ 
+ /*
+ ===============
+@@ -1112,6 +1209,7 @@ static void IN_ProcessEvents( void )
+ 				}
+ 				break;
+ 
++			#if !defined(__EMSCRIPTEN__)
+ 			case SDL_MOUSEMOTION:
+ 				if( mouseActive )
+ 				{
+@@ -1151,6 +1249,7 @@ static void IN_ProcessEvents( void )
+ 					Com_QueueEvent( in_eventTime, SE_KEY, K_MWHEELDOWN, qfalse, 0, NULL );
+ 				}
+ 				break;
++			#endif
+ 
+ 			case SDL_CONTROLLERDEVICEADDED:
+ 			case SDL_CONTROLLERDEVICEREMOVED:
+@@ -1238,16 +1337,21 @@ IN_Frame
+ */
+ void IN_Frame( void )
+ {
++#if !defined(__EMSCRIPTEN__)
+ 	qboolean loading;
++#endif
+ 
+ 	IN_JoyMove( );
+ 
++#if !defined(__EMSCRIPTEN__)
+ 	// If not DISCONNECTED (main menu) or ACTIVE (in game), we're loading
+ 	loading = ( clc.state != CA_DISCONNECTED && clc.state != CA_ACTIVE );
++#endif
+ 
+ 	// update isFullscreen since it might of changed since the last vid_restart
+ 	cls.glconfig.isFullscreen = Cvar_VariableIntegerValue( "r_fullscreen" ) != 0;
+ 
++#if !defined(__EMSCRIPTEN__)
+ 	if( !cls.glconfig.isFullscreen && ( Key_GetCatcher( ) & KEYCATCH_CONSOLE ) )
+ 	{
+ 		// Console is down in windowed mode
+@@ -1265,6 +1369,7 @@ void IN_Frame( void )
+ 	}
+ 	else
+ 		IN_ActivateMouse( cls.glconfig.isFullscreen );
++#endif
+ 
+ 	IN_ProcessEvents( );
+ 
+@@ -1316,6 +1421,10 @@ void IN_Init( void *windowData )
+ 	mouseAvailable = ( in_mouse->value != 0 );
+ 	IN_DeactivateMouse( Cvar_VariableIntegerValue( "r_fullscreen" ) != 0 );
+ 
++#if defined(__EMSCRIPTEN__)
++	IN_InitWebMouse( );
++#endif
++
+ 	appState = SDL_GetWindowFlags( SDL_window );
+ 	Cvar_SetValue( "com_unfocused",	!( appState & SDL_WINDOW_INPUT_FOCUS ) );
+ 	Cvar_SetValue( "com_minimized", appState & SDL_WINDOW_MINIMIZED );
+@@ -1331,6 +1440,10 @@ IN_Shutdown
+ */
+ void IN_Shutdown( void )
+ {
++#if defined(__EMSCRIPTEN__)
++	webPointerLocked = qfalse;
++	webMouseButtons = 0;
++#endif
+ 	SDL_StopTextInput( );
+ 
+ 	IN_DeactivateMouse( Cvar_VariableIntegerValue( "r_fullscreen" ) != 0 );

@@ -1,17 +1,13 @@
+const deploymentBase = import.meta.env?.BASE_URL || '/';
+
 export const GAME_CONFIG = Object.freeze({
   baseGame: 'baseoa',
-  map: 'oa_dm1',
-  bots: ['Sarge', 'Major', 'Grunt'],
-  botSkill: 3,
-  gameType: 0,
-  fragLimit: 20,
-  timeLimit: 10,
   volume: 0.8,
   sensitivity: 5,
-  engineUrl: '/engine/ioquake3.js',
-  engineRevision: 'direct-mouse-bridge-4',
-  configUrl: '/engine/ioquake3-config.json',
-  dataBaseUrl: '/',
+  engineUrl: `${deploymentBase}engine/ioquake3.js`,
+  engineRevision: 'a66ff002-webmouse-5',
+  configUrl: `${deploymentBase}engine/ioquake3-config.json`,
+  dataBaseUrl: deploymentBase,
   filesystemVersion: 1,
 });
 

@@ -26,16 +26,18 @@
         </div>
       </section>
 
-      <section id="loading" class="screen" aria-live="polite">
+      <section id="loading" class="screen" aria-labelledby="loading-title" aria-live="polite">
         <div class="loader-mark">OA</div>
         <h2 id="loading-title">INITIALIZING ARENA</h2>
-        <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+        <div id="progress-track" class="progress-track" role="progressbar" aria-label="Game loading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
         <p id="progress-label">Preparing engine…</p>
       </section>
 
       <section id="resume" class="screen compact">
-        <h2>MATCH PAUSED</h2>
-        <p>The arena is still running.</p>
+        <h2>MOUSE RELEASED</h2>
+        <p>The arena is still running in the background.</p>
         <button id="resume-button" class="primary" type="button">CLICK TO RESUME</button>
       </section>
 
@@ -48,10 +50,10 @@
 
       <div id="hud-tools" class="hud-tools" hidden>
         <button id="fullscreen-button" type="button" title="Toggle fullscreen">FULLSCREEN</button>
-        <button id="debug-button" type="button" title="Show engine log">LOG</button>
+        <button id="debug-button" type="button" title="Show engine log" aria-controls="debug-panel" aria-expanded="false">LOG</button>
       </div>
 
-      <aside id="debug-panel" class="debug-panel" hidden>
+      <aside id="debug-panel" class="debug-panel" role="dialog" aria-label="Engine log" hidden>
         <header><strong>ENGINE LOG</strong><button id="debug-close" type="button">CLOSE</button></header>
         <pre id="debug-output"></pre>
       </aside>

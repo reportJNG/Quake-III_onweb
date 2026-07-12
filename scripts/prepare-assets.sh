@@ -11,5 +11,6 @@ echo "$SHA1  $ARCHIVE" | sha1sum --check -
 unzip -oq "$ARCHIVE" -d "$CACHE/openarena-0.8.8"
 BASEOA="$(find "$CACHE/openarena-0.8.8" -type d -name baseoa -print -quit)"
 [[ -n "$BASEOA" ]] || { echo 'baseoa not found' >&2; exit 1; }
+find "$ROOT/public/baseoa" -maxdepth 1 -type f -name '*.pk3' -delete
 cp "$BASEOA"/*.pk3 "$ROOT/public/baseoa/"
 node "$ROOT/scripts/write-manifest.mjs"

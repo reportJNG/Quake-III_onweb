@@ -1,0 +1,4 @@
+[submodule "vendor/ioq3"]
+	path = vendor/ioq3
+	url = https://github.com/ioquake/ioq3.git
+

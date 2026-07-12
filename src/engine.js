@@ -1,6 +1,51 @@
 import { GAME_CONFIG, startupArguments } from './config.js';
 
 const MAX_LOG_LINES = 400;
+const ASSET_CONCURRENCY = 2;
+
+export async function mapWithConcurrency(items, limit, worker) {
+  const queue = Array.from(items);
+  const workerCount = Math.max(1, Math.min(queue.length, Math.floor(Number(limit)) || 1));
+  let nextIndex = 0;
+  const runners = Array.from({ length: workerCount }, async () => {
+    while (nextIndex < queue.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      await worker(queue[index], index);
+    }
+  });
+  await Promise.all(runners);
+}
+
+export function createAssetProgress(files, emit) {
+  const loadedByFile = files.map(() => 0);
+  const declaredSizes = files.map((file) => Number(file.size) || 0);
+  const usesBytes = declaredSizes.every((size) => size > 0);
+  const total = usesBytes ? declaredSizes.reduce((sum, size) => sum + size, 0) : files.length;
+  const loaded = () => loadedByFile.reduce((sum, value) => sum + value, 0);
+  return {
+    total,
+    usesBytes,
+    update(index, received, responseSize) {
+      loadedByFile[index] = usesBytes
+        ? Math.min(received, declaredSizes[index])
+        : (responseSize ? Math.min(1, received / responseSize) : 0);
+      emit({
+        loaded: loaded(),
+        total,
+        label: `Loading ${files[index].src.split('/').pop()}…`,
+      });
+    },
+    complete(index, completed) {
+      loadedByFile[index] = usesBytes ? declaredSizes[index] : 1;
+      emit({
+        loaded: loaded(),
+        total,
+        label: `Loaded ${completed} of ${files.length} game files`,
+      });
+    },
+  };
+}
 
 export function connectNativeMouseBridge(canvas, module, log = () => {}) {
   const doc = canvas.ownerDocument || document;
@@ -135,6 +180,7 @@ export class ArenaEngine extends EventTarget {
     this.logs = [];
     this.mouseBridge = null;
     this.mouseCapture = null;
+    this.abortController = null;
   }
 
   emit(type, detail = {}) {
@@ -150,13 +196,24 @@ export class ArenaEngine extends EventTarget {
   }
 
   async load() {
+    if (this.disposed) throw new Error('The game engine has been disposed.');
     if (this.module) return this.module;
     if (this.loading) return this.loading;
-    this.loading = this.#load();
+    this.loading = this.#load().catch((error) => {
+      this.#unbindMouseCapture();
+      this.#unbindMouseBridge();
+      this.module = null;
+      this.factory = null;
+      throw error;
+    }).finally(() => {
+      this.loading = null;
+      this.abortController = null;
+    });
     return this.loading;
   }
 
   async #load() {
+    this.abortController = new AbortController();
     this.emit('state', { state: 'loading' });
     this.emit('progress', { loaded: 0, total: 1, label: 'Loading engine module…' });
     let factory;
@@ -175,34 +232,33 @@ export class ArenaEngine extends EventTarget {
 
     const engineBase = new URL(this.config.engineUrl, location.href);
     const engineDir = new URL('.', engineBase).href;
-    try {
-      this.module = await factory({
-        canvas: this.canvas,
-        // Browser-side capture is managed explicitly after the engine is ready.
-        elementPointerLock: false,
-        arguments: startupArguments(this.config),
-        locateFile: (file) => {
-          const url = new URL(file, engineDir);
-          if (this.config.engineRevision) url.searchParams.set('v', this.config.engineRevision);
-          return url.href;
-        },
-        print: (text) => this.log(text, 'stdout'),
-        printErr: (text) => this.log(text, 'stderr'),
-        onAbort: (reason) => this.emit('fatal-error', { error: new Error(String(reason)) }),
-        preRun: [async (module) => this.#prepareFilesystem(module, files)],
-      });
-      this.#bindMouseBridge();
-      this.#bindMouseCapture();
-      this.emit('state', { state: 'ready' });
-      return this.module;
-    } catch (error) {
-      this.emit('fatal-error', { error });
-      throw error;
-    }
+    this.module = await factory({
+      canvas: this.canvas,
+      // Browser-side capture is managed explicitly after the engine is ready.
+      elementPointerLock: false,
+      arguments: startupArguments(this.config),
+      locateFile: (file) => {
+        const url = new URL(file, engineDir);
+        if (this.config.engineRevision) url.searchParams.set('v', this.config.engineRevision);
+        return url.href;
+      },
+      print: (text) => this.log(text, 'stdout'),
+      printErr: (text) => this.log(text, 'stderr'),
+      onAbort: (reason) => {
+        const error = new Error(String(reason));
+        if (this.module) this.emit('fatal-error', { error });
+        else this.log(`Engine initialization aborted: ${error.message}`, 'stderr');
+      },
+      preRun: [async (module) => this.#prepareFilesystem(module, files)],
+    });
+    this.#bindMouseBridge();
+    this.#bindMouseCapture();
+    this.emit('state', { state: 'ready' });
+    return this.module;
   }
 
   async #fetchJson(url) {
-    const response = await fetch(url, { cache: 'no-cache' });
+    const response = await fetch(url, { cache: 'no-cache', signal: this.abortController?.signal });
     if (!response.ok) throw new Error(`Could not load ${url} (${response.status}).`);
     return response.json();
   }
@@ -210,7 +266,7 @@ export class ArenaEngine extends EventTarget {
   async #importEngineModule() {
     const engineUrl = new URL(this.config.engineUrl, location.href);
     if (this.config.engineRevision) engineUrl.searchParams.set('v', this.config.engineRevision);
-    const response = await fetch(engineUrl, { cache: 'no-cache' });
+    const response = await fetch(engineUrl, { cache: 'no-cache', signal: this.abortController?.signal });
     if (!response.ok) throw new Error(`Could not load ${this.config.engineUrl} (${response.status}).`);
     const source = await response.text();
     const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
@@ -226,19 +282,14 @@ export class ArenaEngine extends EventTarget {
     try {
       await this.#mountPersistence(module);
       let completed = 0;
-      const total = files.length;
-      const fetches = files.map((file) => this.#fetchAsset(file, module, (loaded, size) => {
-        const fractional = size ? loaded / size : 0;
-        this.emit('progress', {
-          loaded: completed + fractional,
-          total,
-          label: `Loading ${file.src.split('/').pop()}…`,
+      const progress = createAssetProgress(files, (detail) => this.emit('progress', detail));
+      await mapWithConcurrency(files, ASSET_CONCURRENCY, async (file, index) => {
+        await this.#fetchAsset(file, module, (loaded, responseSize) => {
+          progress.update(index, loaded, responseSize);
         });
-      }).then(() => {
         completed += 1;
-        this.emit('progress', { loaded: completed, total, label: `Loaded ${completed} of ${total} game files` });
-      }));
-      await Promise.all(fetches);
+        progress.complete(index, completed);
+      });
       await this.#syncFilesystem(module, false);
     } finally {
       module.removeRunDependency('setup-openarena-filesystem');
@@ -247,7 +298,7 @@ export class ArenaEngine extends EventTarget {
 
   async #fetchAsset(file, module, onProgress) {
     const url = new URL(file.src, new URL(this.config.dataBaseUrl, location.href));
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: this.abortController?.signal });
     if (!response.ok) throw new Error(`Missing game data: ${file.src} (${response.status}).`);
     const size = Number(response.headers.get('content-length')) || 0;
     let bytes;
@@ -266,6 +317,9 @@ export class ArenaEngine extends EventTarget {
     } else {
       bytes = new Uint8Array(await response.arrayBuffer());
       onProgress(bytes.length, bytes.length);
+    }
+    if (Number(file.size) > 0 && bytes.length !== Number(file.size)) {
+      throw new Error(`Game data size mismatch for ${file.src}: expected ${file.size}, received ${bytes.length}.`);
     }
     const name = file.src.split('/').pop();
     module.FS.mkdirTree(file.dst);
@@ -352,11 +406,6 @@ export class ArenaEngine extends EventTarget {
     this.emit('state', { state: 'running' });
   }
 
-  setVolume(value) {
-    this.config = { ...this.config, volume: Math.max(0, Math.min(1, Number(value))) };
-    this.log(`Volume set to ${this.config.volume}; apply in console with s_volume if match is running.`);
-  }
-
   static async resumeAudio() {
     const contexts = [window.SDL?.audioContext, window.AL?.currentContext?.ctx].filter(Boolean);
     await Promise.all(contexts.map((context) => context.state === 'suspended' ? context.resume() : undefined));
@@ -364,9 +413,12 @@ export class ArenaEngine extends EventTarget {
 
   dispose() {
     this.disposed = true;
+    this.abortController?.abort();
+    this.abortController = null;
     this.#unbindMouseCapture();
     this.#unbindMouseBridge();
-    if (document.pointerLockElement === this.canvas) document.exitPointerLock();
+    const doc = this.canvas.ownerDocument || globalThis.document;
+    if (doc?.pointerLockElement === this.canvas) doc.exitPointerLock();
     this.module?.quit?.();
     this.module = null;
     this.loading = null;

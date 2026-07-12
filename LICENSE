@@ -3,6 +3,7 @@ it under the terms of the GNU General Public License as published by the Free
 Software Foundation, either version 2 of the License, or (at your option) any
 later version.
 
-The full GPL version 2 text is provided in Quake-III-Arena/COPYING.txt and
-vendor/ioq3/COPYING.txt. Third-party components and OpenArena content retain
-their own copyright notices and license documentation.
+The complete GPL version 2 text is provided in vendor/ioq3/COPYING.txt.
+Third-party components and OpenArena content retain their own copyright,
+license, and source-distribution requirements. See THIRD_PARTY.md for the
+pinned components used by this project.

@@ -56,19 +56,10 @@ if (-not $Baseoa) { throw 'The verified archive does not contain a baseoa direct
 
 $Pk3Files = Get-ChildItem -LiteralPath $Baseoa.FullName -File -Filter '*.pk3' | Sort-Object Name
 if ($Pk3Files.Count -eq 0) { throw 'No OpenArena PK3 files were found.' }
+Get-ChildItem -LiteralPath $OutputDir -File -Filter '*.pk3' | Remove-Item -Force
 foreach ($file in $Pk3Files) {
     Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $OutputDir $file.Name) -Force
 }
-
-$Entries = @($Pk3Files | ForEach-Object {
-    [ordered]@{ src = "baseoa/$($_.Name)"; dst = '/baseoa' }
-})
-$Manifest = [ordered]@{
-    baseoa = [ordered]@{
-        version = '0.8.8'
-        archiveSha1 = $ExpectedSha1
-        files = $Entries
-    }
-}
-$Manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $ManifestPath -Encoding utf8
-Write-Host "Prepared $($Pk3Files.Count) PK3 files and wrote public/engine/ioquake3-config.json."
+& node (Join-Path $PSScriptRoot 'write-manifest.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Could not write the game-data manifest.' }
+Write-Host "Prepared $($Pk3Files.Count) PK3 files."

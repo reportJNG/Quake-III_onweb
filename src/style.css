@@ -27,7 +27,7 @@ button:disabled { opacity: .55; cursor: wait; }
 .requirement { color: #777e88; letter-spacing: .1em; }
 .controls { margin-top: 2.5rem; display: grid; grid-template-columns: repeat(3, auto); gap: .8rem 2.2rem; color: #9ca1a9; font-weight: 600; letter-spacing: .08em; }
 kbd { color: #f4f5f2; font-family: inherit; }
-.loader-mark { display: grid; place-content: center; width: 5rem; height: 5rem; border: 2px solid #c8ff2e; color: #c8ff2e; font: 800 1.6rem Orbitron; transform: rotate(45deg); }
+.loader-mark { display: grid; place-content: center; width: 5rem; height: 5rem; border: 2px solid #c8ff2e; color: #c8ff2e; font: 800 1.6rem Impact, sans-serif; transform: rotate(45deg); }
 .loader-mark::first-line { transform: rotate(-45deg); }
 .progress-track { width: min(34rem, 80vw); height: 5px; background: #2a2e34; margin-top: 2rem; overflow: hidden; }
 .progress-bar { width: 2%; height: 100%; background: #c8ff2e; box-shadow: 0 0 18px #c8ff2e; transition: width .18s ease; }
@@ -42,3 +42,4 @@ kbd { color: #f4f5f2; font-family: inherit; }
 .error-code { color: #ff5b55; }
 #error-message { max-width: 42rem; color: #c1c4c8; margin: .8rem 0 2rem; }
 @media (max-width: 700px), (max-height: 600px) { .screen { padding: 1rem; } .controls { grid-template-columns: repeat(2, auto); gap: .5rem 1rem; margin-top: 1.25rem; } .tagline { margin: .7rem 0 1rem; } h1 span { -webkit-text-stroke-width: 1px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }

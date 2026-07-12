@@ -10,12 +10,17 @@ const playButton = document.querySelector('#play-button');
 const resumeButton = document.querySelector('#resume-button');
 const retryButton = document.querySelector('#retry-button');
 const progressBar = document.querySelector('#progress-bar');
+const progressTrack = document.querySelector('#progress-track');
 const progressLabel = document.querySelector('#progress-label');
 const errorMessage = document.querySelector('#error-message');
 const hudTools = document.querySelector('#hud-tools');
 const debugPanel = document.querySelector('#debug-panel');
 const debugOutput = document.querySelector('#debug-output');
+const debugButton = document.querySelector('#debug-button');
+const debugCloseButton = document.querySelector('#debug-close');
 const fullscreenButton = document.querySelector('#fullscreen-button');
+const events = new AbortController();
+const { signal } = events;
 let engine = new ArenaEngine(canvas);
 let launched = false;
 const resolution = new ResolutionController(canvas, gameStage, {
@@ -41,25 +46,27 @@ function browserProblem() {
 function bindEngine() {
   engine.addEventListener('progress', ({ detail }) => {
     const ratio = detail.total ? detail.loaded / detail.total : 0;
-    progressBar.style.width = `${Math.max(2, Math.min(100, ratio * 100))}%`;
+    const percent = Math.max(0, Math.min(100, ratio * 100));
+    progressBar.style.width = `${Math.max(2, percent)}%`;
+    progressTrack.setAttribute('aria-valuenow', String(Math.round(percent)));
     progressLabel.textContent = detail.label;
-  });
+  }, { signal });
   engine.addEventListener('log', ({ detail }) => {
     debugOutput.textContent = detail.lines.join('\n');
     debugOutput.scrollTop = debugOutput.scrollHeight;
-  });
-  engine.addEventListener('fatal-error', ({ detail }) => fail(detail.error));
+  }, { signal });
+  engine.addEventListener('fatal-error', ({ detail }) => fail(detail.error), { signal });
   engine.addEventListener('capturechange', ({ detail }) => {
     if (!launched) return;
     if (detail.locked) show(null);
     else { engine.pause(); show('resume'); }
-  });
+  }, { signal });
   engine.addEventListener('captureerror', ({ detail }) => {
     if (!launched) return;
     console.warn(`Mouse capture was denied: ${detail.error.message}`);
     engine.pause();
     show('resume');
-  });
+  }, { signal });
 }
 
 function fail(error) {
@@ -100,7 +107,7 @@ async function enterArena() {
   }
 }
 
-playButton.addEventListener('click', enterArena);
+playButton.addEventListener('click', enterArena, { signal });
 resumeButton.addEventListener('click', async () => {
   try {
     await engine.resume();
@@ -110,8 +117,8 @@ resumeButton.addEventListener('click', async () => {
     engine.pause();
     show('resume');
   }
-});
-retryButton.addEventListener('click', () => location.reload());
+}, { signal });
+retryButton.addEventListener('click', () => location.reload(), { signal });
 
 function updateFullscreenButton() {
   const active = document.fullscreenElement === app;
@@ -119,29 +126,50 @@ function updateFullscreenButton() {
   fullscreenButton.setAttribute('aria-pressed', String(active));
 }
 
-fullscreenButton.addEventListener('click', async () => {
-  try {
-    if (document.fullscreenElement) await document.exitFullscreen();
-    else await app.requestFullscreen({ navigationUI: 'hide' });
-  } catch (error) {
-    console.warn(`Fullscreen was unavailable: ${error.message}`);
-    updateFullscreenButton();
-  }
-});
-document.addEventListener('fullscreenchange', updateFullscreenButton);
-document.querySelector('#debug-button').addEventListener('click', () => { debugPanel.hidden = false; });
-document.querySelector('#debug-close').addEventListener('click', () => { debugPanel.hidden = true; });
+const fullscreenSupported = typeof app.requestFullscreen === 'function' && typeof document.exitFullscreen === 'function';
+fullscreenButton.hidden = !fullscreenSupported;
+if (fullscreenSupported) {
+  fullscreenButton.addEventListener('click', async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await app.requestFullscreen({ navigationUI: 'hide' });
+    } catch (error) {
+      console.warn(`Fullscreen was unavailable: ${error.message}`);
+      updateFullscreenButton();
+    }
+  }, { signal });
+}
+document.addEventListener('fullscreenchange', updateFullscreenButton, { signal });
+
+function closeDebugPanel({ restoreFocus = true } = {}) {
+  if (debugPanel.hidden) return;
+  debugPanel.hidden = true;
+  debugButton.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) debugButton.focus();
+}
+
+debugButton.addEventListener('click', () => {
+  debugPanel.hidden = false;
+  debugButton.setAttribute('aria-expanded', 'true');
+  debugCloseButton.focus();
+}, { signal });
+debugCloseButton.addEventListener('click', () => closeDebugPanel(), { signal });
 
 const blockedKeys = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab']);
 window.addEventListener('keydown', (event) => {
   if (document.pointerLockElement === canvas && blockedKeys.has(event.code)) event.preventDefault();
-}, { passive: false });
+  if (event.code === 'Escape' && document.pointerLockElement !== canvas && !debugPanel.hidden) {
+    event.preventDefault();
+    closeDebugPanel();
+  }
+}, { passive: false, signal });
 
 bindEngine();
 resolution.start();
 updateFullscreenButton();
 if (import.meta.hot) import.meta.hot.dispose(() => {
+  events.abort();
+  closeDebugPanel({ restoreFocus: false });
   resolution.dispose();
-  document.removeEventListener('fullscreenchange', updateFullscreenButton);
   engine.dispose();
 });
