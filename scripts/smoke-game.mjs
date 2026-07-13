@@ -116,9 +116,7 @@ try {
     if (ready) break;
     await delay(250);
   }
-  if (!ready) throw new Error('The game landing screen did not become ready.');
-  await delay(1000);
-  await evaluate(`document.querySelector('#play-button').click()`);
+  if (!ready) throw new Error('The game page did not become ready.');
 
   let state;
   let initialized = false;
@@ -126,9 +124,7 @@ try {
     state = await evaluate(`(() => ({
       running: document.querySelector('#game-canvas').classList.contains('is-running'),
       failed: document.querySelector('#error').classList.contains('is-visible'),
-      landing: document.querySelector('#landing').classList.contains('is-visible'),
       loading: document.querySelector('#loading').classList.contains('is-visible'),
-      playDisabled: document.querySelector('#play-button').disabled,
       error: document.querySelector('#error-message').textContent,
       log: document.querySelector('#debug-output').textContent
     }))()`);

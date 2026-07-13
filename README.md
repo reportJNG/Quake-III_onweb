@@ -33,7 +33,7 @@ npm run build:engine
 npm run dev
 ```
 
-Open the URL printed by Vite and click **Enter Random Arena**. The first asset preparation downloads approximately 426 MiB. To reuse an existing verified archive:
+Open the URL printed by Vite. The arena starts loading immediately. The first asset preparation downloads approximately 426 MiB. To reuse an existing verified archive:
 
 ```powershell
 npm run prepare:assets -- -Archive "C:\path\to\openarena-0.8.8.zip"
@@ -73,7 +73,7 @@ The engine output directory can vary by CMake generator. Copy `ioquake3.js` and 
 - Tab: scoreboard
 - Escape: release the pointer
 
-Click **Enter Random Arena** to start immediately on one of five curated maps with five skill-5 bots. Matches use a 20-frag or eight-minute limit and rotate through the curated maps automatically. The player model is randomized on each load. Online play and setup menus are intentionally outside this focused mode. Click the canvas to capture the mouse; Escape releases it, and another click recaptures it. Fullscreen and engine-log controls appear in the top-right while the engine is running.
+Opening the page starts one of five curated maps immediately with five skill-5 bots—there is no landing or native setup menu. Matches use a 20-frag or eight-minute limit and rotate through the curated maps automatically. The player model is randomized on each load. Online play and setup menus are intentionally outside this focused mode. Click the canvas once to enable browser audio and capture the mouse; Escape releases it, and another click recaptures it. Fullscreen and engine-log controls appear in the top-right while the engine is running.
 
 The game must be served over HTTP(S), not opened through `file://`. It requires WebAssembly, WebGL 2, Web Audio, and Pointer Lock. Mobile/touch input and internet multiplayer are not supported.
 

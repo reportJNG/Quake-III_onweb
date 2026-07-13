@@ -13,26 +13,14 @@
         <canvas id="game-canvas" tabindex="0" aria-label="OpenArena game canvas"></canvas>
       </div>
 
-      <section id="landing" class="screen is-visible" aria-labelledby="game-title">
-        <div class="eyebrow">IOQUAKE3 · WEBASSEMBLY</div>
-        <h1 id="game-title">OPEN<span>ARENA</span></h1>
-        <p class="tagline">Five arenas. Five hard bots. One click.</p>
-        <button id="play-button" class="primary" type="button">ENTER RANDOM ARENA</button>
-        <p class="requirement">Desktop keyboard + mouse · WebGL 2</p>
-        <div class="controls" aria-label="Game controls">
-          <span><kbd>WASD</kbd> MOVE</span><span><kbd>MOUSE</kbd> AIM / FIRE</span>
-          <span><kbd>SPACE</kbd> JUMP</span><span><kbd>1–9</kbd> WEAPONS</span>
-          <span><kbd>TAB</kbd> SCORE</span><span><kbd>ESC</kbd> RELEASE MOUSE</span>
-        </div>
-      </section>
-
-      <section id="loading" class="screen" aria-labelledby="loading-title" aria-live="polite">
+      <section id="loading" class="screen is-visible" aria-labelledby="loading-title" aria-live="polite">
         <div class="loader-mark">OA</div>
         <h2 id="loading-title">INITIALIZING ARENA</h2>
         <div id="progress-track" class="progress-track" role="progressbar" aria-label="Game loading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <div id="progress-bar" class="progress-bar"></div>
         </div>
         <p id="progress-label">Preparing engine…</p>
+        <p class="requirement">A random arena with five hard bots will start automatically.</p>
       </section>
 
       <section id="resume" class="screen compact">

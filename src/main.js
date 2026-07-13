@@ -5,8 +5,7 @@ import { ResolutionController } from './resolution.js';
 const canvas = document.querySelector('#game-canvas');
 const app = document.querySelector('#app');
 const gameStage = document.querySelector('#game-stage');
-const screens = Object.fromEntries(['landing', 'loading', 'resume', 'error'].map((id) => [id, document.querySelector(`#${id}`)]));
-const playButton = document.querySelector('#play-button');
+const screens = Object.fromEntries(['loading', 'resume', 'error'].map((id) => [id, document.querySelector(`#${id}`)]));
 const resumeButton = document.querySelector('#resume-button');
 const retryButton = document.querySelector('#retry-button');
 const progressBar = document.querySelector('#progress-bar');
@@ -78,37 +77,20 @@ function fail(error) {
 async function enterArena() {
   const unsupported = browserProblem();
   if (unsupported) return fail(new Error(unsupported));
-  // Unlock audio from the initial gesture, but do not capture the mouse yet.
-  // SDL installs its mouse listeners while the engine loads; capturing earlier
-  // means it can miss the pointer-lock transition and receive no mouse movement.
-  try {
-    const UnlockContext = window.AudioContext || window.webkitAudioContext;
-    if (UnlockContext) {
-      const unlock = new UnlockContext();
-      await unlock.resume();
-      await unlock.close();
-    }
-  } catch (error) {
-    console.warn(`Mouse or audio activation was deferred: ${error.message}`);
-  }
   show('loading');
-  playButton.disabled = true;
   try {
     await engine.start({ captureMouse: false });
     resolution.lockBackingStore();
     resolution.sync();
     launched = true;
-    // Show the native UI immediately. The player's first real click on the
-    // canvas is handled by Emscripten and enables SDL relative mouse mode.
+    // Show the running match immediately. The first canvas click captures the
+    // mouse and resumes browser audio, both of which require a user gesture.
     show(null);
   } catch (error) {
     fail(error);
-  } finally {
-    playButton.disabled = false;
   }
 }
 
-playButton.addEventListener('click', enterArena, { signal });
 resumeButton.addEventListener('click', async () => {
   try {
     await engine.resume();
@@ -169,6 +151,7 @@ bindEngine();
 resolution.start();
 updateFullscreenButton();
 app.dataset.ready = 'true';
+enterArena();
 if (import.meta.hot) import.meta.hot.dispose(() => {
   events.abort();
   closeDebugPanel({ restoreFocus: false });
