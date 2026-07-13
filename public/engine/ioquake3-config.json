@@ -1,0 +1,53 @@
+{
+  "baseoa": {
+    "version": "0.8.8",
+    "archiveSha1": "37ab41990b37459822ce8c2fe590607616e1f6d1",
+    "files": [
+      {
+        "src": "baseoa/pak0.pk3",
+        "dst": "/baseoa",
+        "size": 38138505
+      },
+      {
+        "src": "baseoa/pak1-maps.pk3",
+        "dst": "/baseoa",
+        "size": 38421794
+      },
+      {
+        "src": "baseoa/pak2-players-mature.pk3",
+        "dst": "/baseoa",
+        "size": 26754265
+      },
+      {
+        "src": "baseoa/pak2-players.pk3",
+        "dst": "/baseoa",
+        "size": 74389371
+      },
+      {
+        "src": "baseoa/pak4-textures.pk3",
+        "dst": "/baseoa",
+        "size": 97077243
+      },
+      {
+        "src": "baseoa/pak5-TA.pk3",
+        "dst": "/baseoa",
+        "size": 2907315
+      },
+      {
+        "src": "baseoa/pak6-misc.pk3",
+        "dst": "/baseoa",
+        "size": 24912892
+      },
+      {
+        "src": "baseoa/pak6-patch085.pk3",
+        "dst": "/baseoa",
+        "size": 36972040
+      },
+      {
+        "src": "baseoa/pak6-patch088.pk3",
+        "dst": "/baseoa",
+        "size": 70645224
+      }
+    ]
+  }
+}

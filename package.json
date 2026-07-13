@@ -8,9 +8,10 @@
   },
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/verify-runtime-assets.mjs",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "node --check vite.config.js && node --check src/main.js && node --check src/engine.js && node --check src/config.js && node --check src/resolution.js && node --check scripts/manifest.mjs && node --check scripts/write-manifest.mjs",
+    "check": "node --check vite.config.js && node --check src/main.js && node --check src/engine.js && node --check src/config.js && node --check src/resolution.js && node --check scripts/manifest.mjs && node --check scripts/write-manifest.mjs && node --check scripts/verify-runtime-assets.mjs",
     "test": "node --test test/*.test.js",
     "verify": "npm run check && npm test && npm run build",
     "prepare:assets": "powershell -ExecutionPolicy Bypass -File scripts/prepare-assets.ps1",
