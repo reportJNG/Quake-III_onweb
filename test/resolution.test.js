@@ -79,6 +79,10 @@ test('controller synchronizes once, suppresses duplicates, and cleans up', () =>
   assert.equal(controller.sync(), true);
   assert.equal(canvas.width, 1600);
   assert.equal(calls, 3);
+  controller.lockBackingStore();
+  canvas.width = 800;
+  assert.equal(controller.sync(), false);
+  assert.equal(canvas.width, 800);
   controller.dispose();
   assert.equal(disconnected, true);
   windowTarget.dispatchEvent(new Event('resize'));

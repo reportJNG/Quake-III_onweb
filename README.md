@@ -2,7 +2,7 @@
 
 OpenArena Web runs the maintained ioquake3 engine in desktop browsers through WebAssembly. Vite supplies the small HTML, CSS, and JavaScript shell; OpenArena's game code, bots, renderer, input, and audio remain native id Tech 3 code compiled with Emscripten.
 
-The repository does not include retail Quake III data. Asset preparation downloads the freely redistributable OpenArena 0.8.8 release, verifies its official SHA-1, and stages the PK3 files for the web build.
+The repository does not include retail Quake III data. The deployed build contains a focused, freely redistributable OpenArena 0.8.8 asset set: five maps, five hard bots, sound, music, and the gameplay resources they require.
 
 ## Requirements
 
@@ -33,7 +33,7 @@ npm run build:engine
 npm run dev
 ```
 
-Open the URL printed by Vite and click **Play**. The first asset preparation downloads approximately 426 MiB. To reuse an existing verified archive:
+Open the URL printed by Vite and click **Enter Random Arena**. The first asset preparation downloads approximately 426 MiB. To reuse an existing verified archive:
 
 ```powershell
 npm run prepare:assets -- -Archive "C:\path\to\openarena-0.8.8.zip"
@@ -73,7 +73,7 @@ The engine output directory can vary by CMake generator. Copy `ioquake3.js` and 
 - Tab: scoreboard
 - Escape: release the pointer
 
-Click **Play** to open the native OpenArena menu. Select maps, modes, bots, difficulty, and match limits inside the game UI. Click the canvas to capture the mouse; Escape releases it, and another click recaptures it. Fullscreen and engine-log controls appear in the top-right while the engine is running.
+Click **Enter Random Arena** to start immediately on one of five curated maps with five skill-5 bots. Matches use a 20-frag or eight-minute limit and rotate through the curated maps automatically. The player model is randomized on each load. Online play and setup menus are intentionally outside this focused mode. Click the canvas to capture the mouse; Escape releases it, and another click recaptures it. Fullscreen and engine-log controls appear in the top-right while the engine is running.
 
 The game must be served over HTTP(S), not opened through `file://`. It requires WebAssembly, WebGL 2, Web Audio, and Pointer Lock. Mobile/touch input and internet multiplayer are not supported.
 
@@ -84,6 +84,16 @@ npm run verify
 npm run build
 npm run preview
 ```
+
+To rebuild the compact deployment assets after preparing the complete OpenArena release:
+
+```bash
+npm run slim:assets
+npm run verify
+npm run smoke:game
+```
+
+The slim builder traces the five maps' referenced resources, adds the curated players, bots, audio, shaders, and core gameplay files, then emits size-safe PK3 parts and a matching manifest. The browser smoke test launches a real match and verifies renderer, audio, map, and bot initialization.
 
 Deploy the generated `dist/` directory to a static host. `vite preview` is for local verification, not production serving. Root deployments need no additional configuration. For a nested deployment such as `/quake/`, build with:
 
@@ -98,7 +108,7 @@ The base path must begin and end with `/`. The engine, manifest, PK3, JavaScript
 
 - `src/engine.js` loads the generated engine, downloads the manifest's PK3 files with bounded concurrency, mounts IDBFS, and connects browser mouse events to native exports.
 - `src/main.js` owns capability checks, screen state, pointer-lock recovery, fullscreen, responsive resolution, and diagnostics.
-- `scripts/prepare-assets.*` verify and stage OpenArena data, while `scripts/manifest.mjs` produces a deterministic size-aware manifest.
+- `scripts/prepare-assets.*` verify and stage the complete OpenArena data; `scripts/build-slim-assets.mjs` derives the focused deployment pack and writes its size-aware manifest.
 - `scripts/build-engine.ps1` exports the pinned clean ioquake3 source, applies `patches/ioq3-web-mouse.patch` in `.cache`, and verifies the resulting WebAssembly exports.
 
 If the engine is missing, run `npm run build:engine`. If game data is missing, run `npm run prepare:assets`. A corrupt archive is rejected before extraction; remove `.cache/openarena-0.8.8.zip` and retry. If mouse capture is denied, click the canvas again and confirm Pointer Lock is permitted for the site.

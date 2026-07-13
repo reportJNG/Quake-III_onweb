@@ -24,7 +24,7 @@ const { signal } = events;
 let engine = new ArenaEngine(canvas);
 let launched = false;
 const resolution = new ResolutionController(canvas, gameStage, {
-  dprLimit: 2,
+  dprLimit: 1,
   onResize: (detail) => engine.resize(detail),
 });
 
@@ -95,6 +95,7 @@ async function enterArena() {
   playButton.disabled = true;
   try {
     await engine.start({ captureMouse: false });
+    resolution.lockBackingStore();
     resolution.sync();
     launched = true;
     // Show the native UI immediately. The player's first real click on the
@@ -167,6 +168,7 @@ window.addEventListener('keydown', (event) => {
 bindEngine();
 resolution.start();
 updateFullscreenButton();
+app.dataset.ready = 'true';
 if (import.meta.hot) import.meta.hot.dispose(() => {
   events.abort();
   closeDebugPanel({ restoreFocus: false });

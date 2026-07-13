@@ -54,6 +54,7 @@ export class ResolutionController {
     this.state = null;
     this.started = false;
     this.observer = null;
+    this.backingStoreLocked = false;
     this.schedule = this.schedule.bind(this);
   }
 
@@ -84,23 +85,30 @@ export class ResolutionController {
     const resolution = calculateResolution(bounds.width, bounds.height, this.window.devicePixelRatio, this.options);
     if (!resolution) return false;
     const next = Object.freeze({ ...resolution, fullscreen: Boolean(this.document.fullscreenElement) });
-    const canvasMatches = this.canvas.width === next.width
-      && this.canvas.height === next.height
+    const backingMatches = this.backingStoreLocked
+      || (this.canvas.width === next.width && this.canvas.height === next.height);
+    const canvasMatches = backingMatches
       && this.canvas.style.width === `${next.cssWidth}px`
       && this.canvas.style.height === `${next.cssHeight}px`;
     if (sameResolution(this.state, next) && canvasMatches) return false;
 
-    this.canvas.width = next.width;
-    this.canvas.height = next.height;
+    this.state = next;
+    if (!this.backingStoreLocked) {
+      this.onResize(next);
+      this.canvas.width = next.width;
+      this.canvas.height = next.height;
+    }
     this.canvas.style.width = `${next.cssWidth}px`;
     this.canvas.style.height = `${next.cssHeight}px`;
-    this.state = next;
-    this.onResize(next);
     return true;
   }
 
   getState() {
     return this.state;
+  }
+
+  lockBackingStore() {
+    this.backingStoreLocked = true;
   }
 
   dispose() {

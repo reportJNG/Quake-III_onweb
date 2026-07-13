@@ -236,7 +236,10 @@ export class ArenaEngine extends EventTarget {
       canvas: this.canvas,
       // Browser-side capture is managed explicitly after the engine is ready.
       elementPointerLock: false,
-      arguments: startupArguments(this.config),
+      arguments: startupArguments(this.config, undefined, {
+        width: this.canvas.width || 1280,
+        height: this.canvas.height || 720,
+      }),
       locateFile: (file) => {
         const url = new URL(file, engineDir);
         if (this.config.engineRevision) url.searchParams.set('v', this.config.engineRevision);
@@ -391,8 +394,9 @@ export class ArenaEngine extends EventTarget {
   resize(detail) {
     if (!this.module) return;
     this.log(`Display resized to ${detail.width}x${detail.height} (${detail.cssWidth}x${detail.cssHeight} CSS pixels).`);
-    // Emscripten's SDL backend updates its window, GL viewport, and input scale
-    // from the browser resize event after the canvas backing store is changed.
+    // Keep Emscripten's SDL surface and GL viewport synchronized with the
+    // responsive canvas backing store.
+    this.module.setCanvasSize?.(detail.width, detail.height, false);
     window.dispatchEvent(new Event('resize'));
   }
 
